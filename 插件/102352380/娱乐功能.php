@@ -59,6 +59,11 @@ if ($this->用户信息 == "娱乐功能") {
                         "id" => "8",
                         "render_data" => ["label" => "星座运势", "style" => 1],
                         "action" => ["type" => 2, "permission" => ["type" => 2], "data" => "星座运势", "reply" => false, "enter" => false]
+                    ],
+                    [
+                        "id" => "9",
+                        "render_data" => ["label" => "网易热评", "style" => 1],
+                        "action" => ["type" => 2, "permission" => ["type" => 2], "data" => "网易热评", "reply" => false, "enter" => false]
                     ]
                 ]
             ],
