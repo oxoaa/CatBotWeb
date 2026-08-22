@@ -11,7 +11,7 @@ if (preg_match('/^天气查询\s*(.*)$/', $this->用户信息, $match)) {
         return;
     }
 
-    $url = 'http://cyapi.top/API/weather.php?city=' . urlencode($city) . '&n=1&type=text&apikey=7c8c8f084709fcb51f3a0c867f1363ff9d71e0650157bcf405cb3539472372bd';
+    $url = 'https://api.shanhe.kim/API/天气.php?city=' . urlencode($city) . '&type=text';
     $response = get($url);
     $text = (string)$response->getBody();
 
@@ -20,8 +20,13 @@ if (preg_match('/^天气查询\s*(.*)$/', $this->用户信息, $match)) {
         return;
     }
 
-    // 去掉详情页链接行
-    $text = preg_replace('/【城市信息】\n.*?详情页:.*?\n/s', "【城市信息】\n城市: $city\n", $text);
+    // 截取到更新时间行（含）为止
+    if (preg_match('/^(.*更新时间[^\n]*)/s', $text, $m)) {
+        $text = $m[1];
+    }
 
-    $this->发送('md', null, $text);
+    $md = '<@' . $this->用户ID . '>
+' . $text;
+
+    $this->发送('md', null, $md);
 }
