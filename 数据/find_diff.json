@@ -45,11 +45,6 @@
     },
     "_room_F87AB3067C09017E4E003B516708A73F": "39A0EE324D8AAC4DCE6DE2EAFB661976",
     "_room_71A471765FE41DD53B8C9727D1C4BC80": "9E8D1A16797327BD584D996212CD6DF0",
-    "71A471765FE41DD53B8C9727D1C4BC80": {
-        "ans_x": 2,
-        "ans_y": 2,
-        "round": 15
-    },
     "_room_2EADC0901E6B668CFF4302FB07E5FBE1": "2EADC0901E6B668CFF4302FB07E5FBE1",
     "2EADC0901E6B668CFF4302FB07E5FBE1": {
         "ans_x": 3,
@@ -106,5 +101,16 @@
         "ans_x": 2,
         "ans_y": 4,
         "round": 9
+    },
+    "_room_CE1A5F94395147129D2AE93001C0DA29": "59F3621E51074A5031E9CA86CABAEBC5",
+    "71A471765FE41DD53B8C9727D1C4BC80": {
+        "ans_x": 5,
+        "ans_y": 2,
+        "round": 22
+    },
+    "CE1A5F94395147129D2AE93001C0DA29": {
+        "ans_x": 1,
+        "ans_y": 1,
+        "round": 24
     }
 }
