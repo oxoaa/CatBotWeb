@@ -43,9 +43,7 @@ class PluginContext
 
     public function 数据库(string $操作, string $路径, mixed $数据 = null): mixed
     {
-        if ($this->_db === null) {
-            $this->_db = new JsonDatabase($this->_dbPath);
-        }
+        if ($this->_db === null) $this->_db = new JsonDatabase($this->_dbPath);
         return ($this->_db)($操作, $路径, $数据);
     }
 
@@ -58,6 +56,8 @@ class PluginContext
 
 class PluginAPI
 {
+    private static array $tokenCache = [];
+
     public static function 处理(\Swoole\Http\Request $请求, \Swoole\Http\Response $响应, array $配置): void
     {
         $响应->header('Content-Type', 'application/json; charset=utf-8');
@@ -65,11 +65,7 @@ class PluginAPI
         $响应->header('Access-Control-Allow-Headers', '*');
         $响应->header('Access-Control-Allow-Methods', 'POST, OPTIONS');
 
-        if ($请求->getMethod() === 'OPTIONS') {
-            $响应->status(204);
-            $响应->end();
-            return;
-        }
+        if ($请求->getMethod() === 'OPTIONS') { $响应->status(204); $响应->end(); return; }
 
         $body = json_decode($请求->rawContent(), true) ?? [];
         $action = $body['action'] ?? '';
@@ -79,151 +75,191 @@ class PluginAPI
             case 'save':   self::保存($响应, $body); break;
             case 'delete': self::删除($响应, $body); break;
             case 'toggle': self::开关($响应, $body); break;
-            case 'exec':   self::执行($响应, $body); break;
-            default:
-                $响应->end(json_encode(['code' => -1, 'msg' => '未知操作'], JSON_UNESCAPED_UNICODE));
+            case 'exec':   self::执行($响应, $body, $配置); break;
+            default: $响应->end(json_encode(['code' => -1, 'msg' => '未知操作'], JSON_UNESCAPED_UNICODE));
         }
     }
 
-    private static function 插件目录(string $appid): string
-    {
-        return __DIR__ . '/../../插件/' . $appid;
-    }
-
-    private static function 状态文件(string $appid): string
-    {
-        $dir = __DIR__ . '/../../数据';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-        return $dir . '/plugin_state_' . $appid . '.json';
-    }
-
-    private static function 读取状态(string $appid): array
-    {
-        $file = self::状态文件($appid);
-        if (!file_exists($file)) return [];
-        return json_decode(file_get_contents($file), true) ?? [];
-    }
-
-    private static function 保存状态(string $appid, array $状态): void
-    {
-        file_put_contents(self::状态文件($appid), json_encode($状态, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    }
+    private static function 插件目录(string $appid): string { return __DIR__ . '/../../插件/' . $appid; }
+    private static function 状态文件(string $appid): string { $dir = __DIR__ . '/../../数据'; if (!is_dir($dir)) mkdir($dir, 0755, true); return $dir . '/plugin_state_' . $appid . '.json'; }
+    private static function 读取状态(string $appid): array { $f = self::状态文件($appid); return file_exists($f) ? (json_decode(file_get_contents($f), true) ?? []) : []; }
+    private static function 保存状态(string $appid, array $s): void { file_put_contents(self::状态文件($appid), json_encode($s, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)); }
 
     private static function 列表(\Swoole\Http\Response $响应, array $body): void
     {
         $appid = (string)($body['appid'] ?? '');
-        if (empty($appid)) {
-            $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid'], JSON_UNESCAPED_UNICODE));
-            return;
-        }
-        $目录 = self::插件目录($appid);
-        $状态 = self::读取状态($appid);
-        $插件列表 = [];
-        if (is_dir($目录)) {
-            $迭代器 = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($目录, \FilesystemIterator::SKIP_DOTS));
-            foreach ($迭代器 as $文件) {
-                if ($文件->isFile() && $文件->getExtension() === 'php') {
-                    $名称 = $文件->getBasename('.php');
-                    $插件列表[] = ['name' => $名称, 'code' => file_get_contents($文件->getPathname()), 'enabled' => $状态[$名称] ?? true];
-                }
-            }
-        }
-        $响应->end(json_encode(['code' => 0, 'data' => $插件列表], JSON_UNESCAPED_UNICODE));
+        if (empty($appid)) { $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid'], JSON_UNESCAPED_UNICODE)); return; }
+        $dir = self::插件目录($appid); $st = self::读取状态($appid); $list = [];
+        if (is_dir($dir)) { foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $f) { if ($f->isFile() && $f->getExtension() === 'php') { $n = $f->getBasename('.php'); $list[] = ['name' => $n, 'code' => file_get_contents($f->getPathname()), 'enabled' => $st[$n] ?? true]; } } }
+        $响应->end(json_encode(['code' => 0, 'data' => $list], JSON_UNESCAPED_UNICODE));
     }
 
     private static function 保存(\Swoole\Http\Response $响应, array $body): void
     {
-        $appid = (string)($body['appid'] ?? '');
-        $名称 = (string)($body['name'] ?? '');
-        $代码 = (string)($body['code'] ?? '');
-        if (empty($appid) || empty($名称) || empty($代码)) {
-            $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE));
-            return;
-        }
-        $目录 = self::插件目录($appid);
-        if (!is_dir($目录)) mkdir($目录, 0755, true);
-        file_put_contents($目录 . '/' . $名称 . '.php', $代码);
-        PluginLoader::清除缓存();
+        $appid = (string)($body['appid'] ?? ''); $name = (string)($body['name'] ?? ''); $code = (string)($body['code'] ?? '');
+        if (empty($appid) || empty($name) || empty($code)) { $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE)); return; }
+        $dir = self::插件目录($appid); if (!is_dir($dir)) mkdir($dir, 0755, true);
+        file_put_contents($dir . '/' . $name . '.php', $code); PluginLoader::清除缓存();
         $响应->end(json_encode(['code' => 0, 'msg' => '保存成功'], JSON_UNESCAPED_UNICODE));
     }
 
     private static function 删除(\Swoole\Http\Response $响应, array $body): void
     {
-        $appid = (string)($body['appid'] ?? '');
-        $名称 = (string)($body['name'] ?? '');
-        if (empty($appid) || empty($名称)) {
-            $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE));
-            return;
-        }
-        $文件路径 = self::插件目录($appid) . '/' . $名称 . '.php';
-        if (file_exists($文件路径)) unlink($文件路径);
-        PluginLoader::清除缓存();
-        $响应->end(json_encode(['code' => 0, 'msg' => '删除成功'], JSON_UNESCAPED_UNICODE));
+        $appid = (string)($body['appid'] ?? ''); $name = (string)($body['name'] ?? '');
+        if (empty($appid) || empty($name)) { $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE)); return; }
+        $fp = self::插件目录($appid) . '/' . $name . '.php'; if (file_exists($fp)) unlink($fp);
+        PluginLoader::清除缓存(); $响应->end(json_encode(['code' => 0, 'msg' => '删除成功'], JSON_UNESCAPED_UNICODE));
     }
 
     private static function 开关(\Swoole\Http\Response $响应, array $body): void
     {
-        $appid = (string)($body['appid'] ?? '');
-        $名称 = (string)($body['name'] ?? '');
-        $enabled = (bool)($body['enabled'] ?? true);
-        if (empty($appid) || empty($名称)) {
-            $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE));
-            return;
-        }
-        $状态 = self::读取状态($appid);
-        $状态[$名称] = $enabled;
-        self::保存状态($appid, $状态);
-        PluginLoader::清除缓存();
-        $响应->end(json_encode(['code' => 0, 'msg' => $enabled ? '已启用' : '已禁用'], JSON_UNESCAPED_UNICODE));
+        $appid = (string)($body['appid'] ?? ''); $name = (string)($body['name'] ?? ''); $en = (bool)($body['enabled'] ?? true);
+        if (empty($appid) || empty($name)) { $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE)); return; }
+        $st = self::读取状态($appid); $st[$name] = $en; self::保存状态($appid, $st); PluginLoader::清除缓存();
+        $响应->end(json_encode(['code' => 0, 'msg' => $en ? '已启用' : '已禁用'], JSON_UNESCAPED_UNICODE));
     }
 
-    private static function 执行(\Swoole\Http\Response $响应, array $body): void
+    // 获取QQ Bot令牌
+    private static function 获取令牌(array $botConfig): string
+    {
+        $appid = $botConfig['appid'];
+        if (isset(self::$tokenCache[$appid]) && self::$tokenCache[$appid]['expires'] > time() + 60) {
+            return self::$tokenCache[$appid]['token'];
+        }
+        try {
+            $sandbox = !empty($botConfig['sandbox']);
+            $url = $sandbox ? 'https://sandbox.api.sgroup.qq.com' : 'https://api.sgroup.qq.com';
+            $r = HttpClientPool::post("{$url}/v2/oauth2/token", json_encode([
+                'grant_type' => 'client_credentials',
+                'client_id' => (string)$appid,
+                'client_secret' => $botConfig['secret'],
+            ]), ['Content-Type' => 'application/json']);
+            if ($r && $r['statusCode'] === 200) {
+                $d = json_decode($r['body'], true);
+                self::$tokenCache[$appid] = ['token' => $d['access_token'] ?? '', 'expires' => time() + ($d['expires_in'] ?? 7200)];
+                return $d['access_token'] ?? '';
+            }
+        } catch (\Throwable $e) {}
+        return '';
+    }
+
+    // 直接发送消息到QQ
+    private static function 发送到QQ(array $botConfig, string $来源ID, string $事件类型, string $信息ID, array $responses): void
+    {
+        $token = self::获取令牌($botConfig);
+        if (empty($token)) return;
+
+        $sandbox = !empty($botConfig['sandbox']);
+        $apiBase = $sandbox ? 'https://sandbox.api.sgroup.qq.com' : 'https://api.sgroup.qq.com';
+        $appid = $botConfig['appid'];
+
+        $url = match($事件类型) {
+            'GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_DEL_ROBOT', 'GROUP_MEMBER_ADD', 'GROUP_MEMBER_REMOVE'
+                => "{$apiBase}/v2/groups/{$来源ID}/messages",
+            'C2C_MESSAGE_CREATE', 'FRIEND_ADD', 'FRIEND_DEL'
+                => "{$apiBase}/v2/users/{$来源ID}/messages",
+            default => null
+        };
+        if (!$url) return;
+
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Authorization' => 'QQBot ' . $token,
+            'X-Union-Appid' => $appid,
+        ];
+
+        foreach ($responses as $resp) {
+            $type = $resp['type'] ?? '';
+            $content = $resp['content'] ?? '';
+            $extra1 = $resp['extra1'] ?? null;
+            $extra2 = $resp['extra2'] ?? null;
+
+            $data = ['msg_seq' => rand(1, 999999)];
+
+            if ($type === '文本') {
+                $data['content'] = (string)$content;
+                $data['msg_type'] = 0;
+            } elseif (in_array($type, ['md', 'MD', 'markdown', 'MarkDown'])) {
+                $data['msg_type'] = 2;
+                if ($content && !empty($content)) {
+                    $data['markdown'] = ['custom_template_id' => $content, 'params' => $extra1 ?? []];
+                } else {
+                    $data['markdown'] = ['content' => $extra1 ?? ''];
+                }
+                if ($extra2) {
+                    if (is_array($extra2)) {
+                        if (isset($extra2['rows'])) $data['keyboard'] = ['keyboard' => ['content' => $extra2]];
+                        elseif (isset($extra2['content'])) $data['keyboard'] = ['keyboard' => $extra2];
+                        else $data['keyboard'] = ['keyboard' => ['id' => (string)$extra2]];
+                    } else {
+                        $data['keyboard'] = ['keyboard' => ['id' => (string)$extra2]];
+                    }
+                }
+            } else {
+                continue;
+            }
+
+            if (!empty($信息ID)) {
+                $data['msg_id'] = $信息ID;
+            }
+
+            try {
+                HttpClientPool::post($url, json_encode($data, JSON_UNESCAPED_UNICODE), $headers);
+            } catch (\Throwable $e) {}
+        }
+    }
+
+    private static function 执行(\Swoole\Http\Response $响应, array $body, array $配置): void
     {
         $appid = (string)($body['appid'] ?? '');
         $消息 = (string)($body['message'] ?? '');
         $用户ID = (string)($body['user_id'] ?? '');
         $来源ID = (string)($body['source_id'] ?? '');
         $事件类型 = (string)($body['event_type'] ?? 'GROUP_AT_MESSAGE_CREATE');
+        $信息ID = (string)($body['msg_id'] ?? '');
 
         if (empty($appid) || empty($消息)) {
             $响应->end(json_encode(['code' => -1, 'msg' => '参数不完整'], JSON_UNESCAPED_UNICODE));
             return;
         }
 
-        $dbPath = __DIR__ . '/../../数据/数据库';
-        $ctx = new PluginContext([
-            '用户信息' => $消息,
-            '用户ID' => $用户ID,
-            '来源ID' => $来源ID,
-            '信息ID' => (string)($body['msg_id'] ?? ''),
-            '事件类型' => $事件类型,
-            '用户昵称' => (string)($body['nickname'] ?? ''),
-            '当前账号' => ['appid' => (int)$appid],
-        ], $dbPath);
+        // 立即返回给APP
+        $响应->end(json_encode(['code' => 0, 'msg' => 'ok'], JSON_UNESCAPED_UNICODE));
 
-        $目录 = self::插件目录($appid);
-        if (!is_dir($目录)) {
-            $响应->end(json_encode(['code' => 0, 'data' => ['responses' => []]], JSON_UNESCAPED_UNICODE));
-            return;
-        }
+        // 异步执行插件并直接发送到QQ
+        \Swoole\Coroutine\go(function() use ($appid, $消息, $用户ID, $来源ID, $事件类型, $信息ID, $body, $配置) {
+            $dbPath = __DIR__ . '/../../数据/数据库';
+            $ctx = new PluginContext([
+                '用户信息' => $消息, '用户ID' => $用户ID, '来源ID' => $来源ID,
+                '信息ID' => $信息ID, '事件类型' => $事件类型,
+                '用户昵称' => (string)($body['nickname'] ?? ''),
+                '当前账号' => ['appid' => (int)$appid],
+            ], $dbPath);
 
-        $状态 = self::读取状态($appid);
-        $迭代器 = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($目录, \FilesystemIterator::SKIP_DOTS));
+            $目录 = self::插件目录($appid);
+            if (!is_dir($目录)) return;
 
-        foreach ($迭代器 as $文件) {
-            if (!$文件->isFile() || $文件->getExtension() !== 'php') continue;
-            $名称 = $文件->getBasename('.php');
-            if (isset($状态[$名称]) && $状态[$名称] === false) continue;
-            try {
-                $闭包 = \Closure::bind(function() use ($文件) {
-                    require $文件;
-                }, $ctx, PluginContext::class);
-                $闭包();
-            } catch (\Throwable $e) {
-                // 忽略单个插件错误
+            $状态 = self::读取状态($appid);
+            foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($目录, \FilesystemIterator::SKIP_DOTS)) as $文件) {
+                if (!$文件->isFile() || $文件->getExtension() !== 'php') continue;
+                $名称 = $文件->getBasename('.php');
+                if (isset($状态[$名称]) && $状态[$名称] === false) continue;
+                try {
+                    $闭包 = \Closure::bind(fn() => require $文件, $ctx, PluginContext::class);
+                    $闭包();
+                } catch (\Throwable $e) {}
             }
-        }
 
-        $响应->end(json_encode(['code' => 0, 'data' => ['responses' => $ctx->_responses]], JSON_UNESCAPED_UNICODE));
+            if (empty($ctx->_responses)) return;
+
+            // 查找机器人配置
+            $botConfig = null;
+            foreach (($配置['框架']['QQBOT'] ?? []) as $bot) {
+                if ((string)$bot['appid'] === $appid) { $botConfig = $bot; break; }
+            }
+            if (!$botConfig) return;
+
+            self::发送到QQ($botConfig, $来源ID, $事件类型, $信息ID, $ctx->_responses);
+        });
     }
 }
