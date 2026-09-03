@@ -171,11 +171,10 @@ class PluginAPI
                 }
                 if ($extra2) {
                     if (is_array($extra2)) {
-                        if (isset($extra2['rows'])) $data['keyboard'] = ['keyboard' => ['content' => $extra2]];
-                        elseif (isset($extra2['content'])) $data['keyboard'] = ['keyboard' => $extra2];
-                        else $data['keyboard'] = ['keyboard' => ['id' => (string)$extra2]];
+                        if (isset($extra2['rows'])) $data['keyboard'] = ['content' => $extra2];
+                        elseif (isset($extra2['content'])) $data['keyboard'] = ['content' => $extra2];
+                        else $data['keyboard'] = ['id' => (string)$extra2];
                     } else {
-                        $data['keyboard'] = ['keyboard' => ['id' => (string)$extra2]];
                     }
                 }
             } else {
