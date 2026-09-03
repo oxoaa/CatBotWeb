@@ -13,6 +13,15 @@ class PluginLoader
     {
         if (!is_dir($目录)) return;
 
+        $appid = $上下文->当前账号['appid'] ?? '';
+        $状态 = [];
+        if ($appid) {
+            $状态文件 = dirname($目录) . '/数据/plugin_state_' . $appid . '.json';
+            if (file_exists($状态文件)) {
+                $状态 = json_decode(file_get_contents($状态文件), true) ?? [];
+            }
+        }
+
         if (!isset(self::$文件列表缓存[$目录])) {
             $文件列表 = [];
             $目录迭代器 = new \RecursiveIteratorIterator(
@@ -27,6 +36,10 @@ class PluginLoader
         }
 
         foreach (self::$文件列表缓存[$目录] as $文件) {
+            $名称 = basename($文件, '.php');
+            if (isset($状态[$名称]) && $状态[$名称] === false) {
+                continue;
+            }
             try {
                 $闭包 = Closure::bind(function () use ($文件) {
                     require $文件;

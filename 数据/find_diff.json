@@ -112,5 +112,48 @@
         "ans_x": 1,
         "ans_y": 1,
         "round": 24
+    },
+    "_room_2D398F7C1DF0CFCE9B0B322E602B8A98": "2D398F7C1DF0CFCE9B0B322E602B8A98",
+    "2D398F7C1DF0CFCE9B0B322E602B8A98": {
+        "ans_x": 5,
+        "ans_y": 3,
+        "round": 7
+    },
+    "_room_AA8B6ED16E1369F83B4F61AD72CB38EF": "F69AC9F822CD327951B4C5ACFFB5EFEC",
+    "_room_C7FFA857CAD0FBE4F292417C5F4EB349": "8EFD7BF10B1DC4F6440AA30EA3D3D536",
+    "C7FFA857CAD0FBE4F292417C5F4EB349": {
+        "ans_x": 4,
+        "ans_y": 4,
+        "round": 12
+    },
+    "_room_585A95667BF10F1EAA82436A7A1DDCDB": "585A95667BF10F1EAA82436A7A1DDCDB",
+    "585A95667BF10F1EAA82436A7A1DDCDB": {
+        "ans_x": 1,
+        "ans_y": 3,
+        "round": 13
+    },
+    "_room_54B978AC06241C617FD61B838321CCB5": "C672FAF6AD38766F251CB11CB7B64BE6",
+    "54B978AC06241C617FD61B838321CCB5": {
+        "ans_x": 4,
+        "ans_y": 1,
+        "round": 2
+    },
+    "_room_A888DA6A83EA9F02D083190999EE3CC9": "4688F32E53F5C950B3FA6DE85992ACB9",
+    "A888DA6A83EA9F02D083190999EE3CC9": {
+        "ans_x": 1,
+        "ans_y": 1,
+        "round": 15
+    },
+    "_room_C1D8F58F0D4ACA68C38F0214722E6644": "5B03EE4A3641548C99499CAE99B79C19",
+    "C1D8F58F0D4ACA68C38F0214722E6644": {
+        "ans_x": 3,
+        "ans_y": 4,
+        "round": 3
+    },
+    "_room_2604F63CFDAB8D3235519736EE855AEB": "5EAA9DEEB09596CABD5FCE8C6646DA8D",
+    "2604F63CFDAB8D3235519736EE855AEB": {
+        "ans_x": 1,
+        "ans_y": 3,
+        "round": 8
     }
 }
