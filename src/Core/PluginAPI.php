@@ -32,12 +32,7 @@ class PluginContext
 
     public function 发送(string $类型, mixed $主内容 = null, mixed $附加1 = null, mixed $附加2 = null): ?string
     {
-        $this->_responses[] = [
-            'type' => $类型,
-            'content' => $主内容,
-            'extra1' => $附加1,
-            'extra2' => $附加2,
-        ];
+        $this->_responses[] = ['type' => $类型, 'content' => $主内容, 'extra1' => $附加1, 'extra2' => $附加2];
         return 'mock_' . count($this->_responses);
     }
 
@@ -64,12 +59,10 @@ class PluginAPI
         $响应->header('Access-Control-Allow-Origin', '*');
         $响应->header('Access-Control-Allow-Headers', '*');
         $响应->header('Access-Control-Allow-Methods', 'POST, OPTIONS');
-
         if ($请求->getMethod() === 'OPTIONS') { $响应->status(204); $响应->end(); return; }
 
         $body = json_decode($请求->rawContent(), true) ?? [];
         $action = $body['action'] ?? '';
-
         switch ($action) {
             case 'list':   self::列表($响应, $body); break;
             case 'save':   self::保存($响应, $body); break;
@@ -81,7 +74,7 @@ class PluginAPI
     }
 
     private static function 插件目录(string $appid): string { return __DIR__ . '/../../插件/' . $appid; }
-    private static function 状态文件(string $appid): string { $dir = __DIR__ . '/../../数据'; if (!is_dir($dir)) mkdir($dir, 0755, true); return $dir . '/plugin_state_' . $appid . '.json'; }
+    private static function 状态文件(string $appid): string { $d = __DIR__ . '/../../数据'; if (!is_dir($d)) mkdir($d, 0755, true); return $d . '/plugin_state_' . $appid . '.json'; }
     private static function 读取状态(string $appid): array { $f = self::状态文件($appid); return file_exists($f) ? (json_decode(file_get_contents($f), true) ?? []) : []; }
     private static function 保存状态(string $appid, array $s): void { file_put_contents(self::状态文件($appid), json_encode($s, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)); }
 
@@ -119,7 +112,6 @@ class PluginAPI
         $响应->end(json_encode(['code' => 0, 'msg' => $en ? '已启用' : '已禁用'], JSON_UNESCAPED_UNICODE));
     }
 
-    // 获取QQ Bot令牌
     private static function 获取令牌(array $botConfig): string
     {
         $appid = $botConfig['appid'];
@@ -127,23 +119,19 @@ class PluginAPI
             return self::$tokenCache[$appid]['token'];
         }
         try {
-            $sandbox = !empty($botConfig['sandbox']);
-            $url = $sandbox ? 'https://sandbox.api.sgroup.qq.com' : 'https://api.sgroup.qq.com';
-            $r = HttpClientPool::post("{$url}/v2/oauth2/token", json_encode([
-                'grant_type' => 'client_credentials',
-                'client_id' => (string)$appid,
-                'client_secret' => $botConfig['secret'],
-            ]), ['Content-Type' => 'application/json']);
+            $r = HttpClientPool::post('https://bots.qq.com/app/getAppAccessToken', json_encode([
+                'appId' => (string)$appid,
+                'clientSecret' => $botConfig['secret'],
+            ], JSON_UNESCAPED_UNICODE), ['Content-Type' => 'application/json']);
             if ($r && $r['statusCode'] === 200) {
                 $d = json_decode($r['body'], true);
-                self::$tokenCache[$appid] = ['token' => $d['access_token'] ?? '', 'expires' => time() + ($d['expires_in'] ?? 7200)];
+                self::$tokenCache[$appid] = ['token' => $d['access_token'] ?? '', 'expires' => time() + (($d['expires_in'] ?? 7200) - 120)];
                 return $d['access_token'] ?? '';
             }
         } catch (\Throwable $e) {}
         return '';
     }
 
-    // 直接发送消息到QQ
     private static function 发送到QQ(array $botConfig, string $来源ID, string $事件类型, string $信息ID, array $responses): void
     {
         $token = self::获取令牌($botConfig);
@@ -154,19 +142,13 @@ class PluginAPI
         $appid = $botConfig['appid'];
 
         $url = match($事件类型) {
-            'GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_DEL_ROBOT', 'GROUP_MEMBER_ADD', 'GROUP_MEMBER_REMOVE'
-                => "{$apiBase}/v2/groups/{$来源ID}/messages",
-            'C2C_MESSAGE_CREATE', 'FRIEND_ADD', 'FRIEND_DEL'
-                => "{$apiBase}/v2/users/{$来源ID}/messages",
-            default => null
+            'GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_DEL_ROBOT', 'GROUP_MEMBER_ADD', 'GROUP_MEMBER_REMOVE' => "{$apiBase}/v2/groups/{$来源ID}/messages",
+            'C2C_MESSAGE_CREATE', 'FRIEND_ADD', 'FRIEND_DEL' => "{$apiBase}/v2/users/{$来源ID}/messages",
+            default => null,
         };
         if (!$url) return;
 
-        $headers = [
-            'Content-Type' => 'application/json',
-            'Authorization' => 'QQBot ' . $token,
-            'X-Union-Appid' => $appid,
-        ];
+        $headers = ['Content-Type' => 'application/json', 'Authorization' => 'QQBot ' . $token, 'X-Union-Appid' => $appid];
 
         foreach ($responses as $resp) {
             $type = $resp['type'] ?? '';
@@ -175,6 +157,7 @@ class PluginAPI
             $extra2 = $resp['extra2'] ?? null;
 
             $data = ['msg_seq' => rand(1, 999999)];
+            if (!empty($信息ID)) $data['msg_id'] = $信息ID;
 
             if ($type === '文本') {
                 $data['content'] = (string)$content;
@@ -199,12 +182,8 @@ class PluginAPI
                 continue;
             }
 
-            if (!empty($信息ID)) {
-                $data['msg_id'] = $信息ID;
-            }
-
             try {
-                HttpClientPool::post($url, json_encode($data, JSON_UNESCAPED_UNICODE), $headers);
+                $r = HttpClientPool::post($url, json_encode($data, JSON_UNESCAPED_UNICODE), $headers);
             } catch (\Throwable $e) {}
         }
     }
@@ -223,10 +202,8 @@ class PluginAPI
             return;
         }
 
-        // 立即返回给APP
         $响应->end(json_encode(['code' => 0, 'msg' => 'ok'], JSON_UNESCAPED_UNICODE));
 
-        // 异步执行插件并直接发送到QQ
         \Swoole\Coroutine\go(function() use ($appid, $消息, $用户ID, $来源ID, $事件类型, $信息ID, $body, $配置) {
             $dbPath = __DIR__ . '/../../数据/数据库';
             $ctx = new PluginContext([
@@ -252,7 +229,6 @@ class PluginAPI
 
             if (empty($ctx->_responses)) return;
 
-            // 查找机器人配置
             $botConfig = null;
             foreach (($配置['框架']['QQBOT'] ?? []) as $bot) {
                 if ((string)$bot['appid'] === $appid) { $botConfig = $bot; break; }

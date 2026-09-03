@@ -17,6 +17,11 @@
         "appid": 102458371,
         "secret": "rdPCzncRH7yphaTNHC730xvtsrrstvx0",
         "sandbox": false
+      },
+      {
+        "appid": 102348715,
+        "secret": "iEkHoMuT2cDoQ2fIwaFuaGxeM5oYI3oa",
+        "sandbox": false
       }
     ],
     "napcat": [
