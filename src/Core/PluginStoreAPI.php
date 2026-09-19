@@ -43,6 +43,8 @@ class PluginStoreAPI
         $name = (string)($body['name'] ?? '');
         $code = (string)($body['code'] ?? '');
         $authorQQ = (string)($body['author_qq'] ?? '');
+        $authorName = (string)($body['author_name'] ?? '');
+        $authorLink = (string)($body['author_link'] ?? '');
         if (empty($name) || empty($code)) {
             $响应->end(json_encode(['code' => -1, 'msg' => '缺少插件名称或代码'], JSON_UNESCAPED_UNICODE));
             return;
@@ -56,6 +58,8 @@ class PluginStoreAPI
             'name' => $name,
             'code' => $code,
             'author_qq' => $authorQQ,
+            'author_name' => $authorName,
+            'author_link' => $authorLink,
             'time' => time(),
         ];
         file_put_contents($dir . '/' . $id . '.json', json_encode($item, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
