@@ -68,6 +68,7 @@ class PluginAPI
             case 'save':   self::保存($响应, $body); break;
             case 'delete': self::删除($响应, $body); break;
             case 'toggle': self::开关($响应, $body); break;
+            case 'register': self::注册($响应, $body, $配置); break;
             case 'exec':   self::执行($响应, $body, $配置); break;
             default: $响应->end(json_encode(['code' => -1, 'msg' => '未知操作'], JSON_UNESCAPED_UNICODE));
         }
@@ -204,6 +205,37 @@ class PluginAPI
         }
     }
 
+
+    private static function 动态配置文件(): string { return __DIR__ . '/../../数据/bots_dynamic.json'; }
+    private static function 读取动态配置(): array {
+        $f = self::动态配置文件();
+        return file_exists($f) ? (json_decode(file_get_contents($f), true) ?? []) : [];
+    }
+    private static function 保存动态配置(array $bots): void {
+        $d = dirname(self::动态配置文件());
+        if (!is_dir($d)) mkdir($d, 0755, true);
+        file_put_contents(self::动态配置文件(), json_encode($bots, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+    private static function 查找机器人(string $appid, array $配置): ?array {
+        foreach (($配置['框架']['QQBOT'] ?? []) as $bot) {
+            if ((string)$bot['appid'] === $appid) return $bot;
+        }
+        $动态 = self::读取动态配置();
+        if (isset($动态[$appid])) return $动态[$appid];
+        return null;
+    }
+    private static function 注册(\Swoole\Http\Response $响应, array $body, array $配置): void {
+        $appid = (string)($body['appid'] ?? '');
+        $secret = (string)($body['secret'] ?? '');
+        if (empty($appid) || empty($secret)) {
+            $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid或secret'], JSON_UNESCAPED_UNICODE));
+            return;
+        }
+        $bots = self::读取动态配置();
+        $bots[$appid] = ['appid' => $appid, 'secret' => $secret, 'sandbox' => false, 'time' => time()];
+        self::保存动态配置($bots);
+        $响应->end(json_encode(['code' => 0, 'msg' => '注册成功'], JSON_UNESCAPED_UNICODE));
+    }
     private static function 执行(\Swoole\Http\Response $响应, array $body, array $配置): void
     {
         $appid = (string)($body['appid'] ?? '');
@@ -254,10 +286,7 @@ class PluginAPI
 
             if (empty($ctx->_responses)) return;
 
-            $botConfig = null;
-            foreach (($配置['框架']['QQBOT'] ?? []) as $bot) {
-                if ((string)$bot['appid'] === $appid) { $botConfig = $bot; break; }
-            }
+            $botConfig = self::查找机器人($appid, $配置);
             if (!$botConfig) return;
 
             self::发送到QQ($botConfig, $来源ID, $事件类型, $信息ID, $ctx->_responses);
