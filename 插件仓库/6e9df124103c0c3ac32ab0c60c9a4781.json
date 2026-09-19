@@ -1,0 +1,7 @@
+{
+    "id": "6e9df124103c0c3ac32ab0c60c9a4781",
+    "name": "ID获取",
+    "code": "<?php\n\nif ($this->用户信息 == 'ID') {\n    $文本 = \"用户ID：{$this->用户ID}\";\n\n    if (in_array($this->事件类型, [\"GROUP_AT_MESSAGE_CREATE\", \"GROUP_MESSAGE_CREATE\"])) {\n        $文本 .= \"\\n群聊ID：{$this->来源ID}\";\n    }\n\n    $this->发送('文本', $文本);\n}",
+    "author_qq": "",
+    "time": 1789810862
+}

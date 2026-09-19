@@ -221,6 +221,15 @@ class PluginAPI
         $响应->end(json_encode(['code' => 0, 'msg' => 'ok'], JSON_UNESCAPED_UNICODE));
 
         \Swoole\Coroutine\go(function() use ($appid, $消息, $用户ID, $来源ID, $事件类型, $信息ID, $body, $配置) {
+            // 授权检查：非管理员机器人需要授权
+            if ($appid !== '102348715') {
+                $授权文件 = __DIR__ . '/../../数据/授权.json';
+                $授权 = file_exists($授权文件) ? (json_decode(file_get_contents($授权文件), true) ?? []) : [];
+                if (!isset($授权[$appid]) || ($授权[$appid]['过期'] ?? 0) < time()) {
+                    return;
+                }
+            }
+
             $dbPath = __DIR__ . '/../../数据/数据库';
             $ctx = new PluginContext([
                 '用户信息' => $消息, '用户ID' => $用户ID, '来源ID' => $来源ID,
