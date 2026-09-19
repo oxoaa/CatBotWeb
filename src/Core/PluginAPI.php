@@ -177,6 +177,23 @@ class PluginAPI
                     } else {
                     }
                 }
+            } elseif ($type === '语音' || $type === 'voice') {
+                // 语音消息通过文件上传接口发送（srv_send_msg=true直接发送）
+                $fileUrl = $content ?: ($extra1 ?? '');
+                if (empty($fileUrl)) continue;
+                $filesUrl = match($事件类型) {
+                    'GROUP_AT_MESSAGE_CREATE', 'GROUP_MESSAGE_CREATE', 'GROUP_ADD_ROBOT', 'GROUP_DEL_ROBOT', 'GROUP_MEMBER_ADD', 'GROUP_MEMBER_REMOVE' => "{$apiBase}/v2/groups/{$来源ID}/files",
+                    'C2C_MESSAGE_CREATE', 'FRIEND_ADD', 'FRIEND_DEL' => "{$apiBase}/v2/users/{$来源ID}/files",
+                    default => null,
+                };
+                if ($filesUrl) {
+                    $fileData = ['file_type' => 3, 'url' => $fileUrl, 'srv_send_msg' => true];
+                    if (!empty($信息ID)) $fileData['msg_id'] = $信息ID;
+                    try {
+                        HttpClientPool::post($filesUrl, json_encode($fileData, JSON_UNESCAPED_UNICODE), $headers);
+                    } catch (\Throwable $e) {}
+                }
+                continue;
             } else {
                 continue;
             }

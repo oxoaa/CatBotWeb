@@ -115,7 +115,9 @@ class OfficialQQBot extends BaseAdapter
 
                     case "GROUP_AT_MESSAGE_CREATE":
                         $this->用户ID   = $解析["d"]["author"]["id"];
-                        $this->用户信息 = ltrim(trim($解析["d"]["content"]), '/');
+                        $content = $解析["d"]["content"];
+                        $纯文本 = preg_replace('/<@!?[A-F0-9]+>\s*/i', '', $content);
+                        $this->用户信息 = ltrim(trim($纯文本), '/');
                         $this->来源ID   = $解析["d"]["group_id"];
                         $this->信息ID   = $解析["d"]["id"];
                         $this->事件ID   = $解析["id"];

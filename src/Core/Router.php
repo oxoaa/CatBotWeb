@@ -6,11 +6,18 @@ namespace ShengBot\Core;
 use ShengBot\Adapters\OfficialQQBot;
 use ShengBot\Adapters\NapCatBot;
 
+use ShengBot\Core\PluginStoreAPI;
+
 class Router
 {
     public static function 分发(\Swoole\Http\Request $请求, \Swoole\Http\Response $响应, array $配置): void
     {
         $path = $请求->server['request_uri'] ?? '/';
+
+        if (str_starts_with($path, '/api/store')) {
+            PluginStoreAPI::处理($请求, $响应);
+            return;
+        }
 
         if (str_starts_with($path, '/api/')) {
             PluginAPI::处理($请求, $响应, $配置);
