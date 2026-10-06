@@ -1,13 +1,13 @@
-
-if (!function_exists("_gameAt")) {
-function _gameAt(string $id): string {
-    return empty($id) ? "" : "<@" . $id . ">";
-}
-}
 <?php
 /**
  * 文字找茬插件 v16 - 回调按钮(type=1)，任何人都能参与
  */
+
+if (!function_exists("_gameAt")) {
+    function _gameAt(string $id): string {
+        return empty($id) ? "" : "<@" . $id . ">";
+    }
+}
 
 $_dataDir = __DIR__ . "/../../数据";
 if (!is_dir($_dataDir)) { @mkdir($_dataDir, 0755, true); }

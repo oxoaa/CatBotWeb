@@ -2,5 +2,10 @@ vendor/
 node_modules/
 .env
 *.log
-数据/数据库/*.json
+*.zip
+ttt/
 日志/
+数据/*.json
+数据/数据库/*.json
+!数据/.gitkeep
+!数据/数据库/.gitkeep

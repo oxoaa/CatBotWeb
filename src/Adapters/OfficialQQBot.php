@@ -230,8 +230,17 @@ class OfficialQQBot extends BaseAdapter
 
     private function 加载插件(): void
     {
-        $botid = $this->当前账号['appid'] ?? '';
-        PluginLoader::加载(__DIR__ . "/../../插件/{$botid}", $this, $this->logger);
+        $botid = (string)($this->当前账号['appid'] ?? '');
+        // 1. 加载默认全局插件库
+        PluginLoader::加载(__DIR__ . '/../../插件/default', $this, $this->logger);
+
+        // 2. 如果存在当前机器人专属插件目录，则加载专属插件
+        if ($botid !== '') {
+            $botDir = __DIR__ . "/../../插件/{$botid}";
+            if (is_dir($botDir)) {
+                PluginLoader::加载($botDir, $this, $this->logger);
+            }
+        }
     }
 
     public function 获取令牌(): string

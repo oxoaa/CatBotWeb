@@ -1,6 +1,6 @@
 # CatBotWeb 🐱
 
-基于 PHP 8.4+ 和 Swoole 的高性能 QQ 机器人 Webhook 服务端框架。支持官方 QQ 机器人开放平台 Webhook 事件订阅与 NapCat 适配，内置插件扩展体系与动态管理 API。
+基于 PHP 8.4+ 和 Swoole 的高性能 QQ 机器人 Webhook 服务端框架。支持官方 QQ 机器人开放平台 Webhook 事件订阅与 NapCat 适配，内置 35+ 款开箱即用的插件扩展与抖音去水印解析 API。
 
 ---
 
