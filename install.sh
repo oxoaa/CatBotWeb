@@ -315,7 +315,7 @@ fi
 cd "$INSTALL_DIR"
 
 # 确保运行时目录结构与权限
-mkdir -p "$INSTALL_DIR/数据" "$INSTALL_DIR/插件" "$INSTALL_DIR/插件仓库" "$INSTALL_DIR/日志"
+mkdir -p "$INSTALL_DIR/数据" "$INSTALL_DIR/插件" "$INSTALL_DIR/日志"
 chmod -R 755 "$INSTALL_DIR"
 
 # 生成/补全自动加载文件 (vendor/autoload.php)
