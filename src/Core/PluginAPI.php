@@ -64,14 +64,48 @@ class PluginAPI
         $body = json_decode($请求->rawContent(), true) ?? [];
         $action = $body['action'] ?? '';
         switch ($action) {
-            case 'list':   self::列表($响应, $body); break;
-            case 'save':   self::保存($响应, $body); break;
-            case 'delete': self::删除($响应, $body); break;
-            case 'toggle': self::开关($响应, $body); break;
-            case 'register': self::注册($响应, $body, $配置); break;
-            case 'exec':   self::执行($响应, $body, $配置); break;
+            case 'list':       self::列表($响应, $body); break;
+            case 'check_auth': self::检查授权($响应, $body); break;
+            case 'save':       self::保存($响应, $body); break;
+            case 'delete':     self::删除($响应, $body); break;
+            case 'toggle':     self::开关($响应, $body); break;
+            case 'register':   self::注册($响应, $body, $配置); break;
+            case 'exec':       self::执行($响应, $body, $配置); break;
             default: $响应->end(json_encode(['code' => -1, 'msg' => '未知操作'], JSON_UNESCAPED_UNICODE));
         }
+    }
+
+    public static function 是否授权(string $appid): bool
+    {
+        if (empty($appid)) return false;
+        if ($appid === '102348715') return true;
+        $授权文件 = __DIR__ . '/../../数据/授权.json';
+        $授权 = file_exists($授权文件) ? (json_decode(file_get_contents($授权文件), true) ?? []) : [];
+        return isset($授权[$appid]) && ($授权[$appid]['过期'] ?? 0) > time();
+    }
+
+    private static function 检查授权(\Swoole\Http\Response $响应, array $body): void
+    {
+        $appid = (string)($body['appid'] ?? '');
+        if (empty($appid)) {
+            $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid', 'authorized' => false], JSON_UNESCAPED_UNICODE));
+            return;
+        }
+        $isAuth = self::是否授权($appid);
+        $授权文件 = __DIR__ . '/../../数据/授权.json';
+        $授权 = file_exists($授权文件) ? (json_decode(file_get_contents($授权文件), true) ?? []) : [];
+        $info = $授权[$appid] ?? null;
+        $expire = $info['过期'] ?? 0;
+        $days = $info['天数'] ?? 0;
+        $expireDate = $expire > 0 ? date('Y-m-d H:i:s', $expire) : '';
+        $响应->end(json_encode([
+            'code' => 0,
+            'authorized' => $isAuth,
+            'msg' => $isAuth ? '已授权' : '未授权',
+            'expire' => $expire,
+            'expire_date' => $expireDate,
+            'days' => $days,
+        ], JSON_UNESCAPED_UNICODE));
     }
 
     private static function 插件目录(string $appid): string { return __DIR__ . '/../../插件/' . $appid; }
@@ -85,7 +119,11 @@ class PluginAPI
         if (empty($appid)) { $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid'], JSON_UNESCAPED_UNICODE)); return; }
         $dir = self::插件目录($appid); $st = self::读取状态($appid); $list = [];
         if (is_dir($dir)) { foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)) as $f) { if ($f->isFile() && $f->getExtension() === 'php') { $n = $f->getBasename('.php'); $list[] = ['name' => $n, 'code' => file_get_contents($f->getPathname()), 'enabled' => $st[$n] ?? true]; } } }
-        $响应->end(json_encode(['code' => 0, 'data' => $list], JSON_UNESCAPED_UNICODE));
+        $响应->end(json_encode([
+            'code' => 0,
+            'data' => $list,
+            'authorized' => self::是否授权($appid),
+        ], JSON_UNESCAPED_UNICODE));
     }
 
     private static function 保存(\Swoole\Http\Response $响应, array $body): void
@@ -231,10 +269,44 @@ class PluginAPI
             $响应->end(json_encode(['code' => -1, 'msg' => '缺少appid或secret'], JSON_UNESCAPED_UNICODE));
             return;
         }
+        // 写入动态配置
         $bots = self::读取动态配置();
         $bots[$appid] = ['appid' => $appid, 'secret' => $secret, 'sandbox' => false, 'time' => time()];
         self::保存动态配置($bots);
-        $响应->end(json_encode(['code' => 0, 'msg' => '注册成功'], JSON_UNESCAPED_UNICODE));
+
+        // 同步写入 config.json QQBOT 列表（服务器连接用）
+        $configFile = __DIR__ . '/../../config.json';
+        if (file_exists($configFile)) {
+            $config = json_decode(file_get_contents($configFile), true) ?? [];
+            $qqbots = &$config['框架']['QQBOT'];
+            if (!is_array($qqbots)) $qqbots = [];
+            $found = false;
+            foreach ($qqbots as &$bot) {
+                if ((string)$bot['appid'] === $appid) {
+                    $bot['secret'] = $secret;
+                    $bot['sandbox'] = false;
+                    $found = true;
+                    break;
+                }
+            }
+            unset($bot);
+            if (!$found) {
+                $qqbots[] = ['appid' => (int)$appid, 'secret' => $secret, 'sandbox' => false];
+            }
+            file_put_contents($configFile, json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+
+        // 重启服务器使新 bot 连接生效
+        $pidFile = __DIR__ . '/../../server.pid';
+        if (file_exists($pidFile)) {
+            $pid = (int)trim(file_get_contents($pidFile));
+            if ($pid > 0) posix_kill($pid, SIGTERM);
+        } else {
+            // fallback: 杀掉当前 server.php 进程
+            exec('pkill -f "php.*server.php"');
+        }
+
+        $响应->end(json_encode(['code' => 0, 'msg' => '注册成功，服务器已重启'], JSON_UNESCAPED_UNICODE));
     }
     private static function 执行(\Swoole\Http\Response $响应, array $body, array $配置): void
     {
@@ -250,17 +322,22 @@ class PluginAPI
             return;
         }
 
+        // 授权检查
+        if (!self::是否授权($appid)) {
+            $响应->end(json_encode(['code' => 403, 'msg' => '机器人未授权，请联系管理员'], JSON_UNESCAPED_UNICODE));
+            return;
+        }
+
+        // 检查机器人凭证
+        $botConfig = self::查找机器人($appid, $配置);
+        if (!$botConfig) {
+            $响应->end(json_encode(['code' => 404, 'msg' => '机器人未注册，请在APP中重新设置'], JSON_UNESCAPED_UNICODE));
+            return;
+        }
+
         $响应->end(json_encode(['code' => 0, 'msg' => 'ok'], JSON_UNESCAPED_UNICODE));
 
-        \Swoole\Coroutine\go(function() use ($appid, $消息, $用户ID, $来源ID, $事件类型, $信息ID, $body, $配置) {
-            // 授权检查：非管理员机器人需要授权
-            if ($appid !== '102348715') {
-                $授权文件 = __DIR__ . '/../../数据/授权.json';
-                $授权 = file_exists($授权文件) ? (json_decode(file_get_contents($授权文件), true) ?? []) : [];
-                if (!isset($授权[$appid]) || ($授权[$appid]['过期'] ?? 0) < time()) {
-                    return;
-                }
-            }
+        \Swoole\Coroutine\go(function() use ($appid, $消息, $用户ID, $来源ID, $事件类型, $信息ID, $body, $配置, $botConfig) {
 
             $dbPath = __DIR__ . '/../../数据/数据库';
             $ctx = new PluginContext([
@@ -285,9 +362,6 @@ class PluginAPI
             }
 
             if (empty($ctx->_responses)) return;
-
-            $botConfig = self::查找机器人($appid, $配置);
-            if (!$botConfig) return;
 
             self::发送到QQ($botConfig, $来源ID, $事件类型, $信息ID, $ctx->_responses);
         });
