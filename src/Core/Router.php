@@ -14,6 +14,11 @@ class Router
     {
         $path = $请求->server['request_uri'] ?? '/';
 
+        if (str_starts_with($path, '/api/douyin')) {
+            DouyinAPI::处理($请求, $响应);
+            return;
+        }
+
         if (str_starts_with($path, '/api/store')) {
             PluginStoreAPI::处理($请求, $响应);
             return;
